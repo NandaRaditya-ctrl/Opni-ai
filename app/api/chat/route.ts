@@ -23,6 +23,16 @@ export async function POST(req: Request) {
 			body = {};
 		}
 		const prompt = (body && (body.prompt || body.message || body.text)) || '';
+
+		// Demo fallback: if DEMO_MODE=true or client requests demo, return a canned reply
+		const demoMode = process.env.DEMO_MODE === 'true' || body?.demo === true;
+		if (demoMode) {
+			const reply = `Demo mode reply for prompt: ${prompt || '<empty>'}`;
+			return new Response(JSON.stringify({ reply }), {
+				status: 200,
+				headers: { 'Content-Type': 'application/json' },
+			});
+		}
 		if (!prompt) {
 			return new Response(JSON.stringify({ error: 'Missing prompt in request body' }), {
 				status: 400,

@@ -1,3 +1,44 @@
+# Opni-ai (nanda-ai)
+
+Quickstart
+
+1. Clone the repo:
+
+```bash
+git clone https://github.com/NandaRaditya-ctrl/Opni-ai
+cd Opni-ai
+npm install
+```
+
+2. Run dev server:
+
+```bash
+npm run dev
+# opens at http://localhost:3000 (port may vary)
+```
+
+Modes
+
+- Demo mode (no external API required):
+  - Create `.env.local` with `DEMO_MODE=true` or pass `{ demo: true }` in the POST body.
+  - The server will return canned responses so UI works for users without Ollama/HF.
+
+- Ollama (local):
+  - Install Ollama (https://ollama.ai). Pull a model and run:
+    ```bash
+    ollama pull phi3:mini
+    ollama serve
+    ```
+  - Ensure `OLLAMA_URL`/`OLLAMA_MODEL` if you want to customize.
+
+- Hugging Face Inference API:
+  - Create `.env.local` and set `HF_API_KEY=hf_...` and optionally `HF_MODEL`.
+  - Server will use HF when `HF_API_KEY` is present.
+
+Notes
+
+- If your machine cannot run `phi3:mini` due to memory, use `DEMO_MODE` or use Hugging Face.
+- For CLI testing on Windows PowerShell, use `curl.exe` or Node fetch to avoid quoting issues.
 # Nanda AI — Chat App
 
 This is a small Next.js app that proxies prompts to a model backend.
