@@ -111,9 +111,61 @@ export async function POST(req: Request) {
 		if (!resp.ok) {
 			const lower = raw.toLowerCase();
 			const modelNotFound = lower.includes('model') && lower.includes('not found');
-			const suggestion = modelNotFound
-				? `Model '${model}' not found on Ollama. Run: ollama pull ${model} && ollama serve`
-				: '';
+			const outOfMemory = lower.includes('requires more system memory') || lower.includes('out of memory') || lower.includes('memory');
+			let suggestion = '';
+			if (modelNotFound) {
+				suggestion = `Model '${model}' not found on Ollama. Run: ollama pull ${model} && ollama serve`;
+			} else if (outOfMemory) {
+				suggestion = `Model '${model}' failed to start due to insufficient system memory. Use a smaller model, increase available RAM/swap, or use the Hugging Face API by setting HF_API_KEY.`;
+			}
+
+			// Automatic fallback: if OOM on Ollama and HF API key is present, try HF instead
+			if (outOfMemory && process.env.HF_API_KEY) {
+				try {
+					const hfModel = (body && body.model) || process.env.HF_MODEL || 'gpt2';
+					const hfResp = await fetch(`https://api-inference.huggingface.co/models/${encodeURIComponent(hfModel)}`, {
+						method: 'POST',
+						headers: {
+							Authorization: `Bearer ${process.env.HF_API_KEY}`,
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({ inputs: prompt }),
+					});
+
+					if (hfResp.ok) {
+						const json = await hfResp.json().catch(() => null);
+						let reply = '';
+						if (Array.isArray(json)) {
+							if (json.length > 0 && typeof json[0].generated_text === 'string') reply = json[0].generated_text;
+							else if (json.length > 0 && typeof json[0].body === 'string') reply = json[0].body;
+							else reply = JSON.stringify(json);
+						} else if (json && typeof json === 'object') {
+							if (typeof json.generated_text === 'string') reply = json.generated_text;
+							else reply = JSON.stringify(json);
+						} else if (typeof json === 'string') {
+							reply = json;
+						} else {
+							reply = String(json ?? '');
+						}
+
+						return new Response(JSON.stringify({ reply, fallback: 'hf' }), {
+							status: 200,
+							headers: { 'Content-Type': 'application/json' },
+						});
+					}
+				} catch (e) {
+					// if HF fallback also fails, continue to return original Ollama error below
+				}
+			}
+
+			// If DEMO_MODE is enabled, return a canned demo response instead of failing
+			if (process.env.DEMO_MODE === 'true') {
+				const demoReply = `Demo reply (fallback): ${prompt || '<empty>'}`;
+				return new Response(JSON.stringify({ reply: demoReply, fallback: 'demo', suggestion }), {
+					status: 200,
+					headers: { 'Content-Type': 'application/json' },
+				});
+			}
 
 			return new Response(JSON.stringify({ error: 'Ollama request failed', details: raw, suggestion }), {
 				status: 502,
